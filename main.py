@@ -77,4 +77,29 @@ if __name__ == "__main__":
   engine.close()
 
 
+"""
+there different issues
+
+get the data to the network system
+
+I can pass then engine to the objects and they can pass certain communication types that can be converted
+convert the data to bytes
+convert the data from bytes
+
+
+get the data to the things that need it
+
+
+
+there are certain variable types that need to be communicated fundamentally
+
+float
+int
+string
+flags
+
+"""
+
+
+
 # 1.) the port number recieved on the server side can be used to distinguish 
