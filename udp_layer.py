@@ -22,7 +22,6 @@ class UDPLayer:
     """
     retries will re-attempt sending the message if it fails to be recieved
     """
-    print(f"sent! {self.connections}")
     self.message_count += 1
     for connection in self.connections:
       self.socket.sendto(data, connection)
