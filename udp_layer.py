@@ -5,7 +5,35 @@ import struct
 PORT = 59277
 PACKET_SIZE = 512
 
-class UDPLayer:
+class MessageLayer:
+  """
+  This is a test layer just for ensuring that commands get through as expected without relying on two processes
+  """
+  message_layers: list["MessageLayer"] = []
+  def __init__(self, is_server, id: int, test_connection_ids: list[int]):
+    self.id = id
+    self.is_server = is_server
+    MessageLayer.message_layers.append(self)
+    self.connections = test_connection_ids
+    self.test_buffer: list[tuple[bytes, int]] = []
+  
+  def send(self, data: bytes):
+    for message_layer in MessageLayer.message_layers:
+      message_layer.test_buffer.append((data, self.id))
+  
+  def close(self):
+    pass
+  
+  def recieve(self) -> BytesIO | None:
+    
+    data, id = self.test_buffer.pop(0)
+    if self.is_server:
+      if id not in self.connections and data.startswith(b"connect!"):
+        self.connections.append(id)
+    stream = BytesIO(data)
+    return stream
+    
+class UDPLayer():
   def __init__(self, is_server = False, connections: list[tuple[str, int]] = []):
     self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     self.socket.setblocking(False)
@@ -36,3 +64,4 @@ class UDPLayer:
       return stream
     except BlockingIOError:
       return None
+
