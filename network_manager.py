@@ -32,7 +32,7 @@ class NetworkManager:
       "format" : "!ff"
       }}
   
-  def recieve(self):
+  def receive(self):
     
     while True:
       stream = self.udp_layer.recieve()
@@ -50,15 +50,24 @@ class NetworkManager:
       if name == "spawn":
         spawntype = int.from_bytes(stream.read(1))
         
-        info["types"][spawntype]
+        func = info["types"][spawntype]["function"]
+        format = info["types"][spawntype]["format"]
+        
+        func(struct.unpack(format, stream.read(struct.calcsize(format))))
         
   
   def spawn_player(self, *args):
-    self.players.append(Player(*args, id=self.free_player_id))
-    print(self.players)
+    if self.udp_layer.is_server:
+      self.players.append(Player(*args, id=self.free_player_id))
+      #self.udp_layer.send(struct.pack(self.types[ID_SPAWN]["types"]["format"]))
+      self.free_player_id += 1
+    else:
+      self.players.append(Player(*args))
     
-    #if self.udp_layer.is_server:
-    #  self.udp_layer.send(struct.pack(self.types[ID_SPAWN]["types"]["format"]))
+    
+      
+      
+      
     
     
 #TODO spawn a player remotely
@@ -69,4 +78,5 @@ if __name__ == "__main__":
   
   server.spawn_player(15, 4)
   server.spawn_player(32, 6)
+  #test that spawning a player remotely works
   
