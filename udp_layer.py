@@ -18,7 +18,8 @@ class MessageLayer:
     self.test_buffer: list[tuple[bytes, int]] = []
   
   def send(self, data: bytes):
-    for message_layer in MessageLayer.message_layers:
+    for i in self.connections:
+      message_layer = MessageLayer.message_layers[i]
       message_layer.test_buffer.append((data, self.id))
   
   def close(self):
@@ -26,10 +27,15 @@ class MessageLayer:
   
   def recieve(self) -> BytesIO | None:
     
+    if len(self.test_buffer) <= 0:
+      return None
     data, id = self.test_buffer.pop(0)
     if self.is_server:
       if id not in self.connections and data.startswith(b"connect!"):
         self.connections.append(id)
+        return None
+    if data == b'':
+      return None
     stream = BytesIO(data)
     return stream
     

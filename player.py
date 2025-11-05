@@ -2,7 +2,7 @@ import pygame
 from message_manager import MessageManager, Flags, Message
 
 class Player:
-  def __init__(self, x, y, id):
+  def __init__(self, id, x, y):
     self.id = id
     self.position = pygame.Vector2(x, y)
     self.velocity = pygame.Vector2(0, 0)  

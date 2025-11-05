@@ -2,10 +2,13 @@ import struct
 from typing import Type, Callable
 from udp_layer import UDPLayer, MessageLayer
 from player import Player, PlayerMove
+from io import BytesIO
 
 
 
-
+def read_stream(stream: BytesIO, format: str):
+  size = struct.calcsize(format)
+  return struct.unpack(format, stream.read(size))
 
 
 ID_SPAWN = 0
@@ -16,21 +19,19 @@ class NetworkManager:
   
   def __init__(self, udp_layer: MessageLayer | UDPLayer):
     self.udp_layer = udp_layer
-    if not self.udp_layer.is_server:
-      self.udp_layer.send(b"connect!")
+    
     
     self.free_player_id = 0
     self.players = []
-    self.types = {
-      ID_SPAWN : {
-      "name": "spawn", 
-      "types" : {
-        0 : {"function" : self.spawn_player, "format" : "!Bff"} # create a player that has ID and position
-      }},
-      ID_PLAYER_MOVE : {
-      "name" : "playermove",
-      "format" : "!ff"
-      }}
+    
+    self.send_buffer = BytesIO()
+  
+  
+  def initiate_connection(self, optional_server_address = None):
+    if optional_server_address:
+      return
+    #todo
+    
   
   def receive(self):
     
@@ -39,44 +40,62 @@ class NetworkManager:
       if not stream:
         break
       
-      #loop through the data in the stream
-      
-      #1. get the type
-      #2. get the length of the encoded data
-      #if type is spawn then get the spawn type and the spawn info using an architype
-      object_type = int.from_bytes(stream.read(1))
-      info = self.types[object_type]
-      name = info["name"]
-      if name == "spawn":
-        spawntype = int.from_bytes(stream.read(1))
+      while True:
+        typebyte = stream.read(1)
+        if typebyte == b'':
+          break
+        type = int.from_bytes(typebyte)
         
-        func = info["types"][spawntype]["function"]
-        format = info["types"][spawntype]["format"]
-        
-        func(struct.unpack(format, stream.read(struct.calcsize(format))))
-        
+        if type == ID_SPAWN:
+          #decode the spawn type
+          spawntype = int.from_bytes(stream.read(1))
+          if spawntype == 0:
+            self.remote_spawn_player(stream)
+    
+  def server_send(self):
+    """
+    The sever queues up writes and this sends all that is queued
+    """
+    self.send_buffer.seek(0)
+    self.udp_layer.send(self.send_buffer.read())
+    self.send_buffer.seek(0)
+    self.send_buffer.truncate(0)
   
-  def spawn_player(self, *args):
-    if self.udp_layer.is_server:
-      self.players.append(Player(*args, id=self.free_player_id))
-      #self.udp_layer.send(struct.pack(self.types[ID_SPAWN]["types"]["format"]))
-      self.free_player_id += 1
-    else:
-      self.players.append(Player(*args))
-    
-    
-      
-      
-      
-    
-    
-#TODO spawn a player remotely
+  #server messages need to contain a header and a payload. The messages may vary in size greaty and the header may vary a little too
+  
+  def server_spawn_player(self, x, y):
+    self.players.append(Player(self.free_player_id, x, y))
+    data = struct.pack("!BBBff", 0, 0, self.free_player_id, x, y)
+    self.send_buffer.write(data)
+    self.free_player_id += 1
+
+
+  def remote_spawn_player(self, stream):
+    args = read_stream(stream, "!Bff")
+    self.players.append(Player(*args))
+
+
+
 
 if __name__ == "__main__":
-  server = NetworkManager(udp_layer=MessageLayer(True, 0, [1]))
+  server = NetworkManager(udp_layer=MessageLayer(True, 0, []))
+  
   client = NetworkManager(udp_layer=MessageLayer(False, 1, [0]))
   
-  server.spawn_player(15, 4)
-  server.spawn_player(32, 6)
+  #TODO handle joining in a better way than requires the timing to work out perfectly.
+  #this probably means creating some sort of function that gets called when a player connect
+  #packet is recieved and sending the current state in some way. This means sending spawn player
+  #commands remotely probably.
+  
+  
+  
+  server.receive()
+  
+  server.server_spawn_player(15, 4)
+  server.server_spawn_player(83, 32)
+  server.server_send()
+  
+  client.receive()
+  
   #test that spawning a player remotely works
   
