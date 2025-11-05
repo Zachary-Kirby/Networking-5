@@ -1,6 +1,6 @@
 import struct
 from typing import Type, Callable
-from udp_layer import UDPLayer, MessageLayer
+from udp_layer import UDPLayer, MessageLayer, PORT
 from player import Player, PlayerMove
 from io import BytesIO
 
@@ -55,6 +55,8 @@ class NetworkManager:
           spawntype = int.from_bytes(stream.read(1))
           if spawntype == 0:
             self.remote_spawn_player(stream)
+        if type == ID_PLAYER_MOVE:
+          self.remote_player_move(stream)
     
   def server_send(self):
     """
@@ -82,7 +84,8 @@ class NetworkManager:
       if id == player.id:
         player.position.x = x
         player.position.y = y
-    self.udp_layer.send(struct.pack(b"!BBff", ID_PLAYER_MOVE, id, player.position.x, player.position.y))
+        self.udp_layer.send(struct.pack(b"!BBff", ID_PLAYER_MOVE, id, player.position.x, player.position.y))
+        break
 
   def remote_player_move(self, stream: BytesIO):
     #TODO do the position extrapolaton/interpolation thing
@@ -91,21 +94,26 @@ class NetworkManager:
     #TODO There is a chance that there is no player to control at the ID
     for player in self.players:
       if id == player.id:
-        player.position.x += x
-        player.position.y += y
+        player.position.x = x
+        player.position.y = y
     
 
 
 
 if __name__ == "__main__":
-  server = NetworkManager(udp_layer=MessageLayer(True, 0, []))
+  #server = NetworkManager(udp_layer=MessageLayer(True, 0, []))
   
-  client = NetworkManager(udp_layer=MessageLayer(False, 1, [0]))
+  #client = NetworkManager(udp_layer=MessageLayer(False, 1, [0]))
+  
+  server = NetworkManager(udp_layer=UDPLayer(True, []))
+  client = NetworkManager(udp_layer=UDPLayer(False, [("127.0.0.1", PORT)]))
+  
   
   #TODO handle joining in a better way than requires the timing to work out perfectly.
   #this probably means creating some sort of function that gets called when a player connect
   #packet is recieved and sending the current state in some way. This means sending spawn player
   #commands remotely probably.
+  
   
   client.initiate_connection()
   
@@ -119,5 +127,40 @@ if __name__ == "__main__":
   
   server.server_player_move(0, 10, 0)
   
+  client.receive()
+  
+  print(server.players)
+  print(client.players)
+  
+  server.udp_layer.close()
+  client.udp_layer.close()
+  pass
   #test that spawning a player remotely works
+  
+  
+  #initiate connection with reliable message
+  
+  #if connection then send all current state using spawn commands and state commands
+  #DIRECTLY TO THAT CLIENT ONLY
+  
+  #server can spawn new things on clients remotely
+  
+  #server can control things remotely
+  
+  #client can send server specific action commands that control the server in specific ways
+  
+  
+  #command types
+  #spawn
+  #server move player
+  #client input
+  
+  
+  #problems
+  #how do I want to handle client syncing?
+  #   Easiest way is to not initialize the server game state before all players agree they are ready
+  #how do I want to handle client latency?
+  #easiest way to just not, let there be latency! at 30fps 20ms of input latency might not even be detectable
+  
+  
   
