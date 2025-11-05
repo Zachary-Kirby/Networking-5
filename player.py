@@ -15,6 +15,7 @@ class Player:
     if keys[pygame.K_w]: self.position.y -= 4; flags[2]=True
     if keys[pygame.K_s]: self.position.y += 4; flags[3]=True
     message_manager.emit(PlayerMove(Flags([flags])))
+  
   def __repr__(self):
     return f"<{self.id}, [{self.position.x}, {self.position.y}]>"
 
