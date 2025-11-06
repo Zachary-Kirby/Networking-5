@@ -13,6 +13,7 @@ def read_stream(stream: BytesIO, format: str):
 
 ID_SPAWN = 0
 ID_PLAYER_MOVE = 1
+ID_INPUT = 2
 
 ID_SPAWN_PLAYER = 0
 
@@ -55,10 +56,14 @@ class NetworkManager:
           spawntype = int.from_bytes(stream.read(1))
           if spawntype == 0:
             self.remote_spawn_player(stream)
+        
         if type == ID_PLAYER_MOVE:
           self.remote_player_move(stream)
-    
-  def server_send(self):
+        
+        if type == ID_INPUT:
+          self.remote_input(stream)
+  
+  def send(self):
     """
     The sever queues up writes and this sends all that is queued
     """
@@ -96,8 +101,30 @@ class NetworkManager:
       if id == player.id:
         player.position.x = x
         player.position.y = y
-    
-
+  
+  def client_input(self, id, left, right, up, down):
+    binary = left | (right << 1) | (up << 2) | (down << 3)
+    self.send_buffer.write(struct.pack("!BBB", ID_INPUT, id, binary))
+  
+  def remote_input(self, stream):
+    id, binary = read_stream(stream, "!BB")
+    for player in self.players:
+      if player.id == id:
+        player.position.x -= binary >> 0 & 0b0001
+        player.position.x += binary >> 1 & 0b0001
+        player.position.y -= binary >> 2 & 0b0001
+        player.position.y += binary >> 3 & 0b0001
+        self.send_buffer.write(struct.pack("!BBff", ID_PLAYER_MOVE, id, player.position.x, player.position.y))
+  #TODO these are basically the same get the movement code to be separate as it should basically do exactly the same
+  def server_input(self, id, left, right, up ,down):
+    binary = left | (right << 1) | (up << 2) | (down << 3)
+    for player in self.players:
+      if player.id == id:
+        player.position.x -= binary >> 0 & 0b0001
+        player.position.x += binary >> 1 & 0b0001
+        player.position.y -= binary >> 2 & 0b0001
+        player.position.y += binary >> 3 & 0b0001
+        self.send_buffer.write(struct.pack("!BBff", ID_PLAYER_MOVE, id, player.position.x, player.position.y))
 
 
 if __name__ == "__main__":
@@ -121,11 +148,24 @@ if __name__ == "__main__":
   
   server.server_spawn_player(15, 4)
   server.server_spawn_player(83, 32)
-  server.server_send()
+  server.send()
   
   client.receive()
   
   server.server_player_move(0, 10, 0)
+  
+  client.receive()
+  
+  client.client_input(1, 0, 1, 0, 0)
+  client.client_input(1, 0, 1, 0, 0)
+  client.client_input(1, 0, 1, 0, 0)
+  client.client_input(1, 0, 1, 0, 0)
+  
+  client.send()
+  
+  server.receive()
+  
+  server.send()
   
   client.receive()
   
