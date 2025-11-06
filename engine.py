@@ -82,6 +82,7 @@ class Engine:
         
         #GRAPHICS
         self.window.fill((0,0,0))
+        
         if len(self.network_manager.players) > 0:
           self.window.fill((127,127,255), pygame.Rect(self.network_manager.players[0].position, pygame.Vector2(16,16)))
           self.window.fill((255,127,127), pygame.Rect(self.network_manager.players[1].position, pygame.Vector2(16,16)))
