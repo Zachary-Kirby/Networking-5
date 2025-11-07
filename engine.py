@@ -4,7 +4,7 @@ from message_manager import MessageManager
 from udp_layer import UDPLayer
 
 PORT = 59277
-CONNECTION_TABLE = [[("0.0.0.0", PORT)], []]
+CONNECTION_TABLE = [[("127.0.0.1", PORT)], []]
 
 class Engine:
   
@@ -29,11 +29,8 @@ class Engine:
     For now there needs to be a portion waiting for all players so that syncing the data can be hardcoded and once
     """
     while True:
-      players_before = len(self.network_manager.players)
       self.network_manager.receive()
-      #TEMPORARY
-      if len(self.network_manager.players) != players_before:
-        print("player joined!")
+      
       
       for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -52,7 +49,7 @@ class Engine:
       self.pre_start()
       
       #The initial sync
-      for x in range(2):
+      for x in range(len(self.network_manager.udp_layer.connections)+1):
         self.network_manager.server_spawn_player(x*20+160-20*1, 160)
     
     try:
@@ -83,9 +80,8 @@ class Engine:
         #GRAPHICS
         self.window.fill((0,0,0))
         
-        if len(self.network_manager.players) > 0:
-          self.window.fill((127,127,255), pygame.Rect(self.network_manager.players[0].position, pygame.Vector2(16,16)))
-          self.window.fill((255,127,127), pygame.Rect(self.network_manager.players[1].position, pygame.Vector2(16,16)))
+        for i in range(len(self.network_manager.players)):
+          self.window.fill((127,127,255), pygame.Rect(self.network_manager.players[i].position, pygame.Vector2(16,16)))
         pygame.display.update()
         self.clock.tick(self.fps)
     except KeyboardInterrupt:

@@ -11,6 +11,8 @@ def read_stream(stream: BytesIO, format: str):
   return struct.unpack(format, stream.read(size))
 
 
+ID_CONNECT = 99
+
 ID_SPAWN = 0
 ID_PLAYER_MOVE = 1
 ID_INPUT = 2

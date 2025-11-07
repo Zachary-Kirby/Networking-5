@@ -70,4 +70,6 @@ class UDPLayer():
       return stream
     except BlockingIOError:
       return None
+    except IOError:
+      pass
 
