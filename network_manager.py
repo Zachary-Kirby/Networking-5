@@ -1,7 +1,7 @@
 import struct
 from typing import Type, Callable
 from udp_layer import UDPLayer, MessageLayer, PORT
-from player import Player, PlayerMove
+from player import Player
 from io import BytesIO
 
 
@@ -16,21 +16,29 @@ ID_CONNECT = 99
 ID_SPAWN = 0
 ID_PLAYER_MOVE = 1
 ID_INPUT = 2
+ID_PLAYER_ASSIGNMENT = 3
+
+ID_JOIN = 99
 
 ID_SPAWN_PLAYER = 0
 
 class NetworkManager:
   
   
-  def __init__(self, udp_layer: MessageLayer | UDPLayer):
+  def __init__(self, udp_layer: UDPLayer | MessageLayer):
     self.udp_layer = udp_layer
     
     
+    self.player_id: None | int = None
+    if self.udp_layer.is_server: self.player_id = 0
     self.free_player_id = 0
     self.players: list[Player] = []
+    self.assigned_players: list[int] = []
     
     self.send_buffer = BytesIO()
-  
+    
+    if self.udp_layer.is_server:
+      self.server_spawn_player(0, 0)
   
   def initiate_connection(self, optional_server_address = None):
     if optional_server_address:
@@ -53,6 +61,11 @@ class NetworkManager:
           break
         type = int.from_bytes(typebyte)
         
+        #TODO ensure that a server doesn't care about some of these message types so the clients
+        #don't have infinite power
+        
+        #TODO break this out into a dispatch table instead of a long list of if statements
+        
         if type == ID_SPAWN:
           #decode the spawn type
           spawntype = int.from_bytes(stream.read(1))
@@ -64,6 +77,16 @@ class NetworkManager:
         
         if type == ID_INPUT:
           self.remote_input(stream)
+        
+        if type == ID_PLAYER_ASSIGNMENT:
+          self.player_id = read_stream(stream, "!B")[0]
+          print(self.player_id)
+        
+        if type == ID_JOIN:
+          stream.read(len("onnect!"))
+          player_id = self.free_player_id
+          self.server_spawn_player(160, 160)
+          self.send_buffer.write(struct.pack(b"!BB", ID_PLAYER_ASSIGNMENT, player_id))
   
   def send(self):
     """
@@ -148,8 +171,8 @@ if __name__ == "__main__":
   
   server.receive()
   
-  server.server_spawn_player(15, 4)
-  server.server_spawn_player(83, 32)
+  
+  
   server.send()
   
   client.receive()

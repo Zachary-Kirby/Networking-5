@@ -10,11 +10,3 @@ class Player:
   
   def __repr__(self):
     return f"<{self.id}, [{self.position.x}, {self.position.y}]>"
-
-class PlayerMove(Message):
-  
-  def __init__(self, data: Flags):
-    self.data = data
-    
-  def to_bytes(self) -> bytes:
-    return self.data.to_bytes()

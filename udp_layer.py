@@ -33,7 +33,6 @@ class MessageLayer:
     if self.is_server:
       if id not in self.connections and data.startswith(b"connect!"):
         self.connections.append(id)
-        return None
     if data == b'':
       return None
     stream = BytesIO(data)
