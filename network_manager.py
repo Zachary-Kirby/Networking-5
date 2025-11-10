@@ -51,7 +51,7 @@ class NetworkManager:
   def receive(self):
     
     while True:
-      stream = self.udp_layer.recieve()
+      stream, source = self.udp_layer.recieve()
       if not stream:
         break
       
@@ -80,12 +80,13 @@ class NetworkManager:
         
         if type == ID_PLAYER_ASSIGNMENT:
           self.player_id = read_stream(stream, "!B")[0]
-          print(self.player_id)
+          print("assigned ID", self.player_id)
         
         if type == ID_JOIN:
           stream.read(len("onnect!"))
           player_id = self.free_player_id
           self.server_spawn_player(160, 160)
+          #TODO fix this so that the player id is not sent to all but only to the one that connected!
           self.send_buffer.write(struct.pack(b"!BB", ID_PLAYER_ASSIGNMENT, player_id))
   
   def send(self):

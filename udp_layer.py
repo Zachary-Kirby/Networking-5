@@ -1,6 +1,7 @@
 import socket
 from io import BytesIO
 import struct
+from typing import Optional, Any
 
 PORT = 59277
 PACKET_SIZE = 512
@@ -22,21 +23,24 @@ class MessageLayer:
       message_layer = MessageLayer.message_layers[i]
       message_layer.test_buffer.append((data, self.id))
   
+  def send_to(self, data: bytes, address: int):
+    MessageLayer.message_layers[address].test_buffer.append((data, self.id))
+  
   def close(self):
     pass
   
-  def recieve(self) -> BytesIO | None:
+  def recieve(self) -> tuple[Optional[BytesIO], Optional[int]]:
     
     if len(self.test_buffer) <= 0:
-      return None
+      return None, None
     data, id = self.test_buffer.pop(0)
     if self.is_server:
       if id not in self.connections and data.startswith(b"connect!"):
         self.connections.append(id)
     if data == b'':
-      return None
+      return None, None
     stream = BytesIO(data)
-    return stream
+    return stream, id
     
 class UDPLayer():
   def __init__(self, is_server = False, connections: list[tuple[str, int]] = []):
@@ -59,16 +63,19 @@ class UDPLayer():
     for connection in self.connections:
       self.socket.sendto(data, connection)
   
-  def recieve(self) -> BytesIO | None:
+  def send_to(self, data: bytes, address: tuple[str, int], retries = 0):
+    self.socket.sendto(data, address)
+  
+  def recieve(self) -> tuple[Optional[BytesIO], Optional[tuple[str, int]]]:
     try:
       data, address = self.socket.recvfrom(PACKET_SIZE)
       if self.is_server:
         if address not in self.connections and data.startswith(b"connect!"):
           self.connections.append(address)
       stream = BytesIO(data)
-      return stream
+      return (stream, address)
     except BlockingIOError:
-      return None
+      return (None, None)
     except IOError:
-      pass
+      return (None, None)
 

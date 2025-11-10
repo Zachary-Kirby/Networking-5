@@ -47,10 +47,6 @@ class Engine:
       self.network_manager.initiate_connection()
     else:
       self.pre_start()
-      
-      #The initial sync
-      for x in range(len(self.network_manager.udp_layer.connections)+1):
-        self.network_manager.server_spawn_player(x*20+160-20*1, 160)
     
     try:
       while not self.exit_game:
