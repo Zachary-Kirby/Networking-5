@@ -105,7 +105,10 @@ class NetworkManager:
     self.send_buffer.truncate(0)
     
     for destination, stream in self.private_send_buffers.items():
+      stream.seek(0)
       self.udp_layer.send_to(stream.read(), destination)
+      stream.seek(0)
+      stream.truncate(0)
   
   #server messages need to contain a header and a payload. The messages may vary in size greaty and the header may vary a little too
   

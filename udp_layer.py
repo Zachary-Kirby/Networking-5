@@ -23,7 +23,7 @@ class MessageLayer:
       message_layer = MessageLayer.message_layers[i]
       message_layer.test_buffer.append((data, self.id))
   
-  def send_to(self, data: bytes, address: int):
+  def send_to(self, data: bytes, address: Any):
     MessageLayer.message_layers[address].test_buffer.append((data, self.id))
   
   def close(self):
@@ -63,7 +63,7 @@ class UDPLayer():
     for connection in self.connections:
       self.socket.sendto(data, connection)
   
-  def send_to(self, data: bytes, address: tuple[str, int], retries = 0):
+  def send_to(self, data: bytes, address: Any, retries = 0):
     self.socket.sendto(data, address)
   
   def recieve(self) -> tuple[Optional[BytesIO], Optional[tuple[str, int]]]:
