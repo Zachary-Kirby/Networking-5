@@ -36,6 +36,7 @@ class NetworkManager:
     self.assigned_players: list[int] = []
     
     self.send_buffer = BytesIO()
+    self.private_send_buffers: dict[tuple[str, int], BytesIO] = {}
     
     if self.udp_layer.is_server:
       self.server_spawn_player(0, 0)
@@ -59,35 +60,40 @@ class NetworkManager:
         typebyte = stream.read(1)
         if typebyte == b'':
           break
-        type = int.from_bytes(typebyte)
+        type_byte = int.from_bytes(typebyte)
         
         #TODO ensure that a server doesn't care about some of these message types so the clients
         #don't have infinite power
         
         #TODO break this out into a dispatch table instead of a long list of if statements
         
-        if type == ID_SPAWN:
+        if type_byte == ID_SPAWN:
           #decode the spawn type
           spawntype = int.from_bytes(stream.read(1))
           if spawntype == 0:
             self.remote_spawn_player(stream)
         
-        if type == ID_PLAYER_MOVE:
+        if type_byte == ID_PLAYER_MOVE:
           self.remote_player_move(stream)
         
-        if type == ID_INPUT:
+        if type_byte == ID_INPUT:
           self.remote_input(stream)
         
-        if type == ID_PLAYER_ASSIGNMENT:
+        if type_byte == ID_PLAYER_ASSIGNMENT:
           self.player_id = read_stream(stream, "!B")[0]
           print("assigned ID", self.player_id)
         
-        if type == ID_JOIN:
+        if type_byte == ID_JOIN:
           stream.read(len("onnect!"))
           player_id = self.free_player_id
           self.server_spawn_player(160, 160)
           #TODO fix this so that the player id is not sent to all but only to the one that connected!
-          self.send_buffer.write(struct.pack(b"!BB", ID_PLAYER_ASSIGNMENT, player_id))
+          if isinstance(source, tuple):
+            if source not in self.private_send_buffers:
+              self.private_send_buffers[source] = BytesIO()
+            self.private_send_buffers[source].write(struct.pack(b"!BB", ID_PLAYER_ASSIGNMENT, player_id))
+  
+  
   
   def send(self):
     """
@@ -97,6 +103,9 @@ class NetworkManager:
     self.udp_layer.send(self.send_buffer.read())
     self.send_buffer.seek(0)
     self.send_buffer.truncate(0)
+    
+    for destination, stream in self.private_send_buffers.items():
+      self.udp_layer.send_to(stream.read(), destination)
   
   #server messages need to contain a header and a payload. The messages may vary in size greaty and the header may vary a little too
   
