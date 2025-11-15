@@ -35,6 +35,8 @@ class NetworkManager:
     self.players: list[Player] = []
     self.assigned_players: list[int] = []
     
+    #self.enemies: 
+    
     self.send_buffer = BytesIO()
     self.private_send_buffers: dict[tuple[str, int], BytesIO] = {}
     
@@ -92,6 +94,8 @@ class NetworkManager:
             if source not in self.private_send_buffers:
               self.private_send_buffers[source] = BytesIO()
             self.private_send_buffers[source].write(struct.pack(b"!BB", ID_PLAYER_ASSIGNMENT, player_id))
+            
+            #TODO move this into a proper syncing function
             for player in self.players:
               self.private_send_buffers[source].write(struct.pack("!BBBff", ID_SPAWN, ID_SPAWN_PLAYER, player.id, player.position.x, player.position.y))
   
