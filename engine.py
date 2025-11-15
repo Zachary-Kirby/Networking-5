@@ -68,6 +68,7 @@ class Engine:
         
         if self.network_manager.udp_layer.is_server:
           self.network_manager.server_input(0, keys[pygame.K_a], keys[pygame.K_d], keys[pygame.K_w], keys[pygame.K_s])
+          self.network_manager.server_update()
         else:
           if self.network_manager.player_id:
             self.network_manager.client_input(self.network_manager.player_id, keys[pygame.K_a], keys[pygame.K_d], keys[pygame.K_w], keys[pygame.K_s])

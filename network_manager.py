@@ -145,25 +145,43 @@ class NetworkManager:
     self.send_buffer.write(struct.pack("!BBB", ID_INPUT, id, binary))
   
   def remote_input(self, stream):
+    #Move the player based on 
     id, binary = read_stream(stream, "!BB")
     for player in self.players:
       if player.id == id:
-        player.position.x -= binary >> 0 & 0b0001
-        player.position.x += binary >> 1 & 0b0001
-        player.position.y -= binary >> 2 & 0b0001
-        player.position.y += binary >> 3 & 0b0001
+        player.velocity.x -= binary >> 0 & 0b0001
+        player.velocity.x += binary >> 1 & 0b0001
+        player.velocity.y -= binary >> 2 & 0b0001
+        player.velocity.y += binary >> 3 & 0b0001
+        
         self.send_buffer.write(struct.pack("!BBff", ID_PLAYER_MOVE, id, player.position.x, player.position.y))
+  
   #TODO these are basically the same get the movement code to be separate as it should basically do exactly the same
+  
   def server_input(self, id, left, right, up ,down):
+    #Move the player and send result to everyone
     binary = left | (right << 1) | (up << 2) | (down << 3)
     for player in self.players:
       if player.id == id:
-        player.position.x -= binary >> 0 & 0b0001
-        player.position.x += binary >> 1 & 0b0001
-        player.position.y -= binary >> 2 & 0b0001
-        player.position.y += binary >> 3 & 0b0001
-        self.send_buffer.write(struct.pack("!BBff", ID_PLAYER_MOVE, id, player.position.x, player.position.y))
-
+        player.velocity.x -= binary >> 0 & 0b0001
+        player.velocity.x += binary >> 1 & 0b0001
+        player.velocity.y -= binary >> 2 & 0b0001
+        player.velocity.y += binary >> 3 & 0b0001
+        
+  
+  def server_update(self):
+    for player in self.players:
+      player.position += player.velocity
+      player.velocity *= 0.9
+      self.send_buffer.write(struct.pack("!BBff", ID_PLAYER_MOVE, player.id, player.position.x, player.position.y))
+      for player2 in self.players:
+        if player is player2: continue
+        difference = (player2.position - player.position)
+        l2 = difference.dot(difference)
+        if l2 < 15*15:
+          l = l2**0.5
+          player2.position += difference / l * (15-l)
+  
 
 if __name__ == "__main__":
   #server = NetworkManager(udp_layer=MessageLayer(True, 0, []))
