@@ -8,9 +8,15 @@ class RedEnemy:
     self.velocity = pygame.Vector2(0, 0)
     self.target: Optional[pygame.Vector2] = None
     self.enemies: Optional[list["RedEnemy"]] = None
+    self.dash_timer = 0
+    self.dash_time = 240
   
   def update(self):
-    self.position += self.velocity
+    if self.velocity.length_squared() < 5*5:
+      self.dash_timer += 1
+    
+    if self.velocity.length_squared() > 0:
+      self.position += self.velocity.normalize() * min(self.velocity.length(), 10)
     if self.enemies:
       for enemy in self.enemies:
         dif = (enemy.position - self.position)
@@ -21,8 +27,10 @@ class RedEnemy:
       dif = (self.target - self.position)
       l = dif.dot(dif)
       self.velocity += dif * 0.1
-      if l != 0:
+      if l != 0 and self.dash_timer <= self.dash_time:
         self.velocity -= (self.target - self.position) / l * 1000
+      if l < 16*16:
+        self.dash_timer = 0
     self.velocity *= 0.9
   
   def draw(self, window: pygame.Surface):
