@@ -19,6 +19,7 @@ ID_PLAYER_MOVE = 1
 ID_INPUT = 2
 ID_PLAYER_ASSIGNMENT = 3
 ID_ENEMY_MOVE = 4
+ID_ENEMY_POSITION = 5
 
 ID_JOIN = 99
 
@@ -40,6 +41,7 @@ class NetworkManager:
     
     self.enemies: list[RedEnemy] = []
     self.free_enemy_id = 0
+    self.refresh_enemy = 0
     
     self.send_buffer = BytesIO()
     self.private_send_buffers: dict[tuple[str, int], BytesIO] = {}
@@ -94,6 +96,9 @@ class NetworkManager:
         if type_byte == ID_ENEMY_MOVE:
           self.remote_enemy_move(stream)
         
+        if type_byte == ID_ENEMY_POSITION:
+          self.remote_enemy_set_position(stream)
+        
         if type_byte == ID_JOIN:
           stream.read(len("onnect!"))
           player_id = self.free_player_id
@@ -109,7 +114,7 @@ class NetworkManager:
             for player in self.players:
               self.private_send_buffers[source].write(struct.pack("!BBBff", ID_SPAWN, ID_SPAWN_PLAYER, player.id, player.position.x, player.position.y))
             for enemy in self.enemies:
-              self.private_send_buffers[source].write(struct.pack("!BBBff", ID_SPAWN, ID_SPAWN_RED_ENEMY, enemy.id, enemy.position.x, enemy.position.y))
+              self.private_send_buffers[source].write(struct.pack("!BBBhh", ID_SPAWN, ID_SPAWN_RED_ENEMY, enemy.id, int(enemy.position.x), int(enemy.position.y)))
   
   
   
@@ -118,7 +123,9 @@ class NetworkManager:
     The sever queues up writes and this sends all that is queued
     """
     self.send_buffer.seek(0)
-    self.udp_layer.send(self.send_buffer.read())
+    data = self.send_buffer.read()
+    print(len(data))
+    self.udp_layer.send(data)
     self.send_buffer.seek(0)
     self.send_buffer.truncate(0)
     
@@ -130,26 +137,32 @@ class NetworkManager:
   
   #server messages need to contain a header and a payload. The messages may vary in size greaty and the header may vary a little too
   
+  
   def server_spawn_player(self, x, y):
     self.players.append(Player(self.free_player_id, x, y))
     data = struct.pack("!BBBff", ID_SPAWN, ID_SPAWN_PLAYER, self.free_player_id, x, y)
     self.send_buffer.write(data)
     self.free_player_id += 1
   
+  
   def server_spawn_red_enemy(self, x, y):
     self.enemies.append(RedEnemy(self.free_enemy_id, x, y))
-    data = struct.pack("!BBBff", ID_SPAWN, ID_SPAWN_RED_ENEMY, self.free_enemy_id, x, y)
+    self.enemies[-1].enemies = self.enemies
+    data = struct.pack("!BBBhh", ID_SPAWN, ID_SPAWN_RED_ENEMY, self.free_enemy_id, int(x), int(y))
     self.send_buffer.write(data)
-    self.free_player_id += 1
-    
+    self.free_enemy_id += 1
+  
   
   def remote_spawn_player(self, stream):
     args = read_stream(stream, "!Bff")
     self.players.append(Player(*args))
   
+  
   def remote_spawn_red_enemy(self, stream):
-    args = read_stream(stream, "!Bff")
+    args = read_stream(stream, "!Bhh")
     self.enemies.append(RedEnemy(*args))
+    self.enemies[-1].enemies = self.enemies
+    
   
   def server_player_move(self, id, x, y):
     for player in self.players:
@@ -158,6 +171,7 @@ class NetworkManager:
         player.position.y = y
         self.udp_layer.send(struct.pack(b"!BBff", ID_PLAYER_MOVE, id, player.position.x, player.position.y))
         break
+
 
   def remote_player_move(self, stream: BytesIO):
     #TODO do the position extrapolaton/interpolation thing
@@ -169,16 +183,26 @@ class NetworkManager:
         player.position.x = x
         player.position.y = y
   
+  
   def remote_enemy_move(self, stream: BytesIO):
-    id, x, y = read_stream(stream, "!Bff")
+    id, x, y = read_stream(stream, "!Bhh")
+    for enemy in self.enemies:
+      if enemy.id == id:
+        enemy.position.x += x / 100
+        enemy.position.y += y / 100
+  
+  def remote_enemy_set_position(self, stream: BytesIO):
+    id, x, y = read_stream(stream, "!Bhh")
     for enemy in self.enemies:
       if enemy.id == id:
         enemy.position.x = x
         enemy.position.y = y
   
+  
   def client_input(self, id, left, right, up, down):
     binary = left | (right << 1) | (up << 2) | (down << 3)
     self.send_buffer.write(struct.pack("!BBB", ID_INPUT, id, binary))
+  
   
   def remote_input(self, stream):
     #Move the player based on 
@@ -203,7 +227,7 @@ class NetworkManager:
         player.velocity.x += binary >> 1 & 0b0001
         player.velocity.y -= binary >> 2 & 0b0001
         player.velocity.y += binary >> 3 & 0b0001
-        
+  
   
   def server_update(self):
     for player in self.players:
@@ -217,6 +241,7 @@ class NetworkManager:
         if l2 < 15*15:
           l = l2**0.5
           player2.position += difference / l * (15-l)
+    
     for enemy in self.enemies:
       closest_position = None
       closest_distance = -1
@@ -230,8 +255,15 @@ class NetworkManager:
           closest_distance = dist
           closest_position = player.position
       enemy.target = closest_position
+      previous_position = enemy.position.copy()
       enemy.update()
-      self.send_buffer.write(struct.pack("!BBff", ID_ENEMY_MOVE, enemy.id, enemy.position.x, enemy.position.y))
+      delta_position = enemy.position - previous_position
+      
+      self.send_buffer.write(struct.pack("!BBhh", ID_ENEMY_MOVE, enemy.id, int(delta_position.x*100), int(delta_position.y*100)))
+    if len(self.enemies):
+      self.refresh_enemy = (self.refresh_enemy + 1) % len(self.enemies)
+      refresh_enemy = self.enemies[self.refresh_enemy]
+      self.send_buffer.write(struct.pack("!BBhh", ID_ENEMY_POSITION, refresh_enemy.id, int(refresh_enemy.position.x), int(refresh_enemy.position.y)))
 
 if __name__ == "__main__":
   #server = NetworkManager(udp_layer=MessageLayer(True, 0, []))

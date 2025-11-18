@@ -10,7 +10,7 @@ class Engine:
   
   
   def __init__(self, is_server = False):
-    self.window_size = [320, 320]
+    self.window_size = [640, 640]
     self.window = pygame.display.set_mode(self.window_size)
     if is_server: pygame.display.set_caption("server")
     
@@ -63,7 +63,10 @@ class Engine:
         #GRAPHICS
         self.window.fill((0,0,0))
         
+        
+        
         for enemy in self.network_manager.enemies:
+          #print(enemy.id)
           enemy.draw(self.window)
         
         for i in range(len(self.network_manager.players)):
