@@ -12,41 +12,24 @@ class Engine:
   def __init__(self, is_server = False):
     self.window_size = [320, 320]
     self.window = pygame.display.set_mode(self.window_size)
+    if is_server: pygame.display.set_caption("server")
     
-    self.pos1 = pygame.Vector2(160+80,160)
-    self.pos2 = pygame.Vector2(160-80,160)
     self.exit_game = False
     self.clock = pygame.time.Clock()
     self.fps = 60
     self.message_manager = MessageManager()
     self.network_manager = NetworkManager(udp_layer=UDPLayer(is_server, CONNECTION_TABLE[is_server]))
     
-    self.send_queue = []
-    #self.message_manager.register(PlayerMove, )
+    
   
-  def pre_start(self):
-    """
-    For now there needs to be a portion waiting for all players so that syncing the data can be hardcoded and once
-    """
-    while True:
-      self.network_manager.receive()
-      
-      
-      for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-          self.exit_game = True
-          return
-        if event.type == pygame.KEYDOWN:
-          if event.key == pygame.K_ESCAPE:
-            return
-      
+  
+  
   
   def run(self):
     
+    #TODO make this a button in a menu with an IP address box
     if not self.network_manager.udp_layer.is_server:
       self.network_manager.initiate_connection()
-    else:
-      self.pre_start()
     
     try:
       while not self.exit_game:
@@ -69,6 +52,8 @@ class Engine:
         if self.network_manager.udp_layer.is_server:
           self.network_manager.server_input(0, keys[pygame.K_a], keys[pygame.K_d], keys[pygame.K_w], keys[pygame.K_s])
           self.network_manager.server_update()
+          if keys[pygame.K_f]:
+            self.network_manager.server_spawn_red_enemy(*pygame.mouse.get_pos())
         else:
           if self.network_manager.player_id:
             self.network_manager.client_input(self.network_manager.player_id, keys[pygame.K_a], keys[pygame.K_d], keys[pygame.K_w], keys[pygame.K_s])
@@ -78,8 +63,12 @@ class Engine:
         #GRAPHICS
         self.window.fill((0,0,0))
         
+        for enemy in self.network_manager.enemies:
+          enemy.draw(self.window)
+        
         for i in range(len(self.network_manager.players)):
           self.window.fill((127,127,255), pygame.Rect(self.network_manager.players[i].position, pygame.Vector2(16,16)))
+        
         pygame.display.update()
         self.clock.tick(self.fps)
     except KeyboardInterrupt:
