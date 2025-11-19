@@ -267,7 +267,7 @@ class NetworkManager:
       previous_position = enemy.position.copy()
       enemy.update()
       delta_position = enemy.position - previous_position
-      #self.send_buffer.write(struct.pack("!BBhh", ID_ENEMY_POSITION, enemy.id, int(enemy.position.x), int(enemy.position.y)))
+      
       self.send_buffer.write(struct.pack("!BBbb", ID_ENEMY_MOVE, enemy.id, int(delta_position.x*10), int(delta_position.y*10)))
     
     
