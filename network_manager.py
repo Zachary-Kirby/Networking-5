@@ -239,6 +239,8 @@ class NetworkManager:
   
   
   def server_update(self):
+    
+    #TODO move to Player code
     for player in self.players:
       player.position += player.velocity
       player.velocity *= 0.9
@@ -251,6 +253,7 @@ class NetworkManager:
           l = l2**0.5
           player2.position += difference / l * (15-l)
     
+    #TODO move to enemy code
     for enemy in self.enemies:
       closest_position = None
       closest_distance = -1
@@ -268,6 +271,8 @@ class NetworkManager:
       enemy.update()
       delta_position = enemy.position - previous_position
       
+      #TODO move delta code such that it is based on the message send interval
+      #this means setting the previous enemy position around the time of sending too
       self.send_buffer.write(struct.pack("!BBbb", ID_ENEMY_MOVE, enemy.id, int(delta_position.x*10), int(delta_position.y*10)))
     
     
