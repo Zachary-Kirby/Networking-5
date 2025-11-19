@@ -4,7 +4,7 @@ from udp_layer import UDPLayer, MessageLayer, PORT
 from player import Player
 from enemy import RedEnemy
 from io import BytesIO
-
+import time
 
 
 def read_stream(stream: BytesIO, format: str):
@@ -45,6 +45,8 @@ class NetworkManager:
     
     self.send_buffer = BytesIO()
     self.private_send_buffers: dict[tuple[str, int], BytesIO] = {}
+    self.tick_rate = 1/30
+    self.last_tick = time.monotonic()
     
     if self.udp_layer.is_server:
       self.server_spawn_player(0, 0)
@@ -119,12 +121,19 @@ class NetworkManager:
   
   
   def send(self):
+    #if self.udp_layer.is_server:
+    #  if time.monotonic() > self.last_tick + self.tick_rate:
+    #    self.last_tick = time.monotonic()
+    #  else:
+    #    return
     """
     The sever queues up writes and this sends all that is queued
     """
     self.send_buffer.seek(0)
     data = self.send_buffer.read()
+    
     print(len(data))
+    
     self.udp_layer.send(data)
     self.send_buffer.seek(0)
     self.send_buffer.truncate(0)
@@ -185,11 +194,11 @@ class NetworkManager:
   
   
   def remote_enemy_move(self, stream: BytesIO):
-    id, x, y = read_stream(stream, "!Bhh")
+    id, x, y = read_stream(stream, "!Bbb")
     for enemy in self.enemies:
       if enemy.id == id:
-        enemy.position.x += x / 100
-        enemy.position.y += y / 100
+        enemy.position.x += x / 10
+        enemy.position.y += y / 10
   
   def remote_enemy_set_position(self, stream: BytesIO):
     id, x, y = read_stream(stream, "!Bhh")
@@ -258,8 +267,11 @@ class NetworkManager:
       previous_position = enemy.position.copy()
       enemy.update()
       delta_position = enemy.position - previous_position
-      
-      self.send_buffer.write(struct.pack("!BBhh", ID_ENEMY_MOVE, enemy.id, int(delta_position.x*100), int(delta_position.y*100)))
+      #self.send_buffer.write(struct.pack("!BBhh", ID_ENEMY_POSITION, enemy.id, int(enemy.position.x), int(enemy.position.y)))
+      self.send_buffer.write(struct.pack("!BBbb", ID_ENEMY_MOVE, enemy.id, int(delta_position.x*10), int(delta_position.y*10)))
+    
+    
+    
     if len(self.enemies):
       self.refresh_enemy = (self.refresh_enemy + 1) % len(self.enemies)
       refresh_enemy = self.enemies[self.refresh_enemy]

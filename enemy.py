@@ -5,6 +5,7 @@ class RedEnemy:
   def __init__(self, id, x, y):
     self.id = id
     self.position = pygame.Vector2(x, y)
+    self.last_tick_position = self.position.copy()
     self.velocity = pygame.Vector2(0, 0)
     self.target: Optional[pygame.Vector2] = None
     self.enemies: Optional[list["RedEnemy"]] = None
