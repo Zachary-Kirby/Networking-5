@@ -34,7 +34,8 @@ class NetworkManager:
     
     
     self.player_id: None | int = None
-    if self.udp_layer.is_server: self.player_id = 0
+    # (Change) no longer will a player be automatic since even the host is a client
+    #if self.udp_layer.is_server: self.player_id = 0
     self.free_player_id = 0
     self.players: list[Player] = []
     self.assigned_players: list[int] = []
@@ -48,8 +49,9 @@ class NetworkManager:
     self.tick_rate = 1/30
     self.last_tick = time.monotonic()
     
-    if self.udp_layer.is_server:
-      self.server_spawn_player(0, 0)
+    # (Change) no longer will a player be automatic since even the host is a client
+    #if self.udp_layer.is_server:
+    #  self.server_spawn_player(0, 0)
   
   def initiate_connection(self, optional_server_address = None):
     if optional_server_address:
