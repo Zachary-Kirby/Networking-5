@@ -2,6 +2,7 @@ import pygame
 from network_manager import NetworkManager
 from message_manager import MessageManager
 from udp_layer import UDPLayer
+import time
 
 PORT = 59277
 CONNECTION_TABLE = [[("127.0.0.1", PORT)], []]
@@ -19,17 +20,16 @@ class Engine:
     self.clock = pygame.time.Clock()
     self.fps = 60
     self.message_manager = MessageManager()
-    # (Change) now server has a client network manager too since it is a client
     self.network_manager = NetworkManager(udp_layer=UDPLayer(False, CONNECTION_TABLE[0])) 
     self.hosting = is_server
     if self.hosting:
-      # (Change) now the server has a host network manager with the real objects
+      self.host_last_sent_timestamp = time.monotonic() - 1/20 # (Change) this is to send a message now
+      self.host_send_interval = 1/20
       self.host = NetworkManager(udp_layer=UDPLayer(is_server, CONNECTION_TABLE[is_server]))
   
   def run(self):
     
     #TODO make this a button in a menu with an IP address box
-    # (Change) this now should always be connecting since even the host is a client to itself
     self.network_manager.initiate_connection()
     
     try:
@@ -48,22 +48,19 @@ class Engine:
         
         #NETWORK
         
-        # (Change) Always ran for since host will also recieve from itself
+        
         self.network_manager.receive()
         
-        
-        # (Change) do host logic if a hosting
-        if self.hosting:
+        if self.hosting and time.monotonic() - self.host_last_sent_timestamp >= self.host_send_interval:
           self.host.receive()
-          # (Change) no longer will the server send inputs directly to itself like this. It will do
-          # the same as any other client
-          #self.network_manager.server_input(0, keys[pygame.K_a], keys[pygame.K_d], keys[pygame.K_w], keys[pygame.K_s])
           self.host.server_update()
-          # TODO this should be relitive to the host player if I want this to continue to exist
+          # TODO this should be relative to the host player if I want this to continue to exist
           if keys[pygame.K_f]:
             self.host.server_spawn_red_enemy(*pygame.mouse.get_pos())
+          
+          self.host.send()
+          self.host_last_sent_timestamp = time.monotonic()
         
-        # (Change) Host now is a client of itself so this is always ran as soon as the 'client' recieves the player id
         if self.network_manager.player_id != None:
           
           #TODO make this send inputs twice and with a timestamp to let the server not repeat inputs
@@ -71,18 +68,14 @@ class Engine:
           self.network_manager.client_input(self.network_manager.player_id, keys[pygame.K_a], keys[pygame.K_d], keys[pygame.K_w], keys[pygame.K_s])
         
         self.network_manager.send()
-        if self.hosting:
-          self.host.send()
-        # (Change) if this is a host it needs to send a message too
+        
+        
         
         
         #GRAPHICS 
         self.window.fill((0,0,0))
         
-        print(self.host.players)
-        
         for enemy in self.network_manager.enemies:
-          #print(enemy.id)
           enemy.draw(self.window)
         
         for i in range(len(self.network_manager.players)):
