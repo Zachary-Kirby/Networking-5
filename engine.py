@@ -18,14 +18,21 @@ class Engine:
     
     self.exit_game = False
     self.clock = pygame.time.Clock()
-    self.fps = 60
+    self.fps = 240
     self.message_manager = MessageManager()
     self.network_manager = NetworkManager(udp_layer=UDPLayer(False, CONNECTION_TABLE[0])) 
+    
+    
+    
     self.hosting = is_server
+    self.host_send_interval = 1/20
     if self.hosting:
-      self.host_last_sent_timestamp = time.monotonic() - 1/20 # (Change) this is to send a message now
-      self.host_send_interval = 1/20
+      self.host_last_sent_timestamp = time.monotonic() - self.host_send_interval
       self.host = NetworkManager(udp_layer=UDPLayer(is_server, CONNECTION_TABLE[is_server]))
+    
+    #TODO this is actually exploitable, but probably an easy fix
+    self.client_send_interval = self.host_send_interval
+    self.client_last_sent_timestamp = time.monotonic() - self.client_send_interval
   
   def run(self):
     
@@ -44,7 +51,6 @@ class Engine:
         
         
         
-        #SIMULATION
         
         #NETWORK
         
@@ -61,11 +67,14 @@ class Engine:
           self.host.send()
           self.host_last_sent_timestamp = time.monotonic()
         
-        if self.network_manager.player_id != None:
-          
+        #Player code (TODO move player code out of the main loop)
+        if self.network_manager.player_id != None and time.monotonic() - self.client_last_sent_timestamp >= self.client_send_interval:
           #TODO make this send inputs twice and with a timestamp to let the server not repeat inputs
           #and to give some reliability to inputs
           self.network_manager.client_input(self.network_manager.player_id, keys[pygame.K_a], keys[pygame.K_d], keys[pygame.K_w], keys[pygame.K_s])
+          player = self.network_manager.players[self.network_manager.player_id]
+          self.client_last_sent_timestamp = time.monotonic()
+        
         
         self.network_manager.send()
         
@@ -76,10 +85,12 @@ class Engine:
         self.window.fill((0,0,0))
         
         for enemy in self.network_manager.enemies:
-          enemy.draw(self.window)
+          enemy.draw(self.window, self.host_send_interval)
         
         for i in range(len(self.network_manager.players)):
-          self.window.fill((127,127,255), pygame.Rect(self.network_manager.players[i].position, pygame.Vector2(16,16)))
+          player = self.network_manager.players[i]
+          interpolated_position = player.previous_position + (player.position - player.previous_position) * (time.monotonic() - player.previous_update_time) / self.host_send_interval
+          self.window.fill((127,127,255), pygame.Rect(interpolated_position, pygame.Vector2(16,16)))
         
         pygame.display.update()
         self.clock.tick(self.fps)

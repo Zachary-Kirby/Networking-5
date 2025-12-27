@@ -191,16 +191,20 @@ class NetworkManager:
     #TODO There is a chance that there is no player to control at the ID
     for player in self.players:
       if id == player.id:
+        player.previous_position = player.position.copy()
         player.position.x = x
         player.position.y = y
+        player.previous_update_time = time.monotonic()
   
   
   def remote_enemy_move(self, stream: BytesIO):
     id, x, y = read_stream(stream, "!Bbb")
     for enemy in self.enemies:
       if enemy.id == id:
-        enemy.position.x += x / 10
-        enemy.position.y += y / 10
+        enemy.previous_position = enemy.position.copy()
+        enemy.position.x += x / 10 * 3
+        enemy.position.y += y / 10 * 3
+        enemy.previous_update_time = time.monotonic()
   
   def remote_enemy_set_position(self, stream: BytesIO):
     id, x, y = read_stream(stream, "!Bhh")
@@ -214,38 +218,45 @@ class NetworkManager:
     binary = left | (right << 1) | (up << 2) | (down << 3)
     self.send_buffer.write(struct.pack("!BBB", ID_INPUT, id, binary))
   
+  def player_move(self, player: Player, binary: int):
+    """
+    Docstring for player_move
+    
+    :param player: player object to move
+    :param binary: left right up down bits for control
+    """
+    player.velocity.x -= (binary >> 0 & 0b0001) * player.SPEED
+    player.velocity.x += (binary >> 1 & 0b0001) * player.SPEED
+    player.velocity.y -= (binary >> 2 & 0b0001) * player.SPEED
+    player.velocity.y += (binary >> 3 & 0b0001) * player.SPEED
+  
+  def player_update(self, player: Player, delta = 1/20):
+    player.position += player.velocity * delta
+    player.velocity *= pow(0.002, delta)
   
   def remote_input(self, stream):
     #Move the player based on 
     id, binary = read_stream(stream, "!BB")
     for player in self.players:
       if player.id == id:
-        player.velocity.x -= binary >> 0 & 0b0001
-        player.velocity.x += binary >> 1 & 0b0001
-        player.velocity.y -= binary >> 2 & 0b0001
-        player.velocity.y += binary >> 3 & 0b0001
+        self.player_move(player, binary)
         
         self.send_buffer.write(struct.pack("!BBff", ID_PLAYER_MOVE, id, player.position.x, player.position.y))
   
-  #TODO these are basically the same get the movement code to be separate as it should basically do exactly the same
-  
+  #TODO remove this since the host is a client now I think
   def server_input(self, id, left, right, up ,down):
     #Move the player and send result to everyone
     binary = left | (right << 1) | (up << 2) | (down << 3)
     for player in self.players:
       if player.id == id:
-        player.velocity.x -= binary >> 0 & 0b0001
-        player.velocity.x += binary >> 1 & 0b0001
-        player.velocity.y -= binary >> 2 & 0b0001
-        player.velocity.y += binary >> 3 & 0b0001
+        self.player_move(player, binary)
   
   
   def server_update(self):
     
     #TODO move to Player code
     for player in self.players:
-      player.position += player.velocity
-      player.velocity *= 0.9
+      self.player_update(player)
       self.send_buffer.write(struct.pack("!BBff", ID_PLAYER_MOVE, player.id, player.position.x, player.position.y))
       for player2 in self.players:
         if player is player2: continue
@@ -253,7 +264,8 @@ class NetworkManager:
         l2 = difference.dot(difference)
         if l2 < 15*15:
           l = l2**0.5
-          player2.position += difference / l * (15-l)
+          if l != 0:
+            player2.position += difference / l * (15-l)
     
     #TODO move to enemy code
     for enemy in self.enemies:
@@ -275,7 +287,7 @@ class NetworkManager:
       
       #TODO move delta code such that it is based on the message send interval
       #this means setting the previous enemy position around the time of sending too
-      self.send_buffer.write(struct.pack("!BBbb", ID_ENEMY_MOVE, enemy.id, int(delta_position.x*10), int(delta_position.y*10)))
+      self.send_buffer.write(struct.pack("!BBbb", ID_ENEMY_MOVE, enemy.id, int(delta_position.x*10/3), int(delta_position.y*10/3)))
     
     
     
