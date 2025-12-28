@@ -134,7 +134,7 @@ class NetworkManager:
     self.send_buffer.seek(0)
     data = self.send_buffer.read()
     
-    print(len(data))
+    print(f"sent {len(data)} bytes")
     
     self.udp_layer.send(data)
     self.send_buffer.seek(0)
