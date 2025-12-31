@@ -6,7 +6,11 @@ if __name__ == "__main__":
     is_server = True
   else:
     is_server = False
-  engine = Engine(is_server=is_server)
+  if len(sys.argv)>2:
+    headless = True
+  else:
+    headless = False
+  engine = Engine(is_server=is_server, headless=headless)
   engine.run()
   engine.close()
 
