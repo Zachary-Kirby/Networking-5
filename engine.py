@@ -6,9 +6,9 @@ import time
 import random
 
 PORT = 59277
-CONNECTION_TABLE = [[("127.0.0.1", PORT)], []]
+CONNECTION_TABLE = [[("168.231.69.217", PORT)], []]
 
-
+#vps address 168.231.69.217
 
 class Engine:
   
