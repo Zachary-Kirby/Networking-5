@@ -4,9 +4,10 @@ from message_manager import MessageManager
 from udp_layer import UDPLayer
 import time
 import random
+from player import Player
 
 PORT = 59277
-CONNECTION_TABLE = [[("168.231.69.217", PORT)], []]
+CONNECTION_TABLE = [[("127.0.0.1", PORT)], []]
 
 #vps address 168.231.69.217
 
@@ -16,6 +17,7 @@ class Engine:
   def __init__(self, is_server = False, headless = False):
     #this should be stuff available to both the client and the server sides of things
     self.headless_mode = headless
+    
     if not self.headless_mode:
       self.window_size = [640, 640]
       self.window = pygame.display.set_mode(self.window_size)
@@ -29,7 +31,9 @@ class Engine:
     if not self.headless_mode:
       self.network_manager = NetworkManager(udp_layer=UDPLayer(False, CONNECTION_TABLE[0])) 
     
-    
+    if not headless:
+      self.client_side_player = Player(0, 160, 160)
+      self.client_side_player_lerp_time = 0
     
     self.hosting = is_server
     self.host_send_interval = 1/20
@@ -69,9 +73,21 @@ class Engine:
         #NETWORK
         
         
-        
         if not self.headless_mode:
-          self.network_manager.receive()
+          #Player code (TODO move player code out of the main loop)
+          if self.network_manager.player_id != None and time.monotonic() - self.client_last_sent_timestamp >= self.client_send_interval:
+            #TODO make this send inputs twice and with a timestamp to let the server not repeat inputs
+            #and to give some reliability to inputs
+            self.network_manager.client_input(self.network_manager.player_id, keys[pygame.K_a], keys[pygame.K_d], keys[pygame.K_w], keys[pygame.K_s])
+            player = self.network_manager.players[self.network_manager.player_id]
+            self.client_last_sent_timestamp = time.monotonic()
+            self.client_side_player.previous_position = self.client_side_player.position.copy()
+            self.network_manager.player_move(self.client_side_player, self.network_manager.input_binary(keys[pygame.K_a], keys[pygame.K_d], keys[pygame.K_w], keys[pygame.K_s]))
+            self.network_manager.player_update(self.client_side_player, 1/20)
+            self.client_side_player.previous_update_time = time.monotonic()
+            
+            self.network_manager.send()
+        
         
         if self.hosting and time.monotonic() - self.host_last_sent_timestamp >= self.host_send_interval:
           self.host.receive()
@@ -84,16 +100,10 @@ class Engine:
           self.host_last_sent_timestamp = time.monotonic()
         
         if not self.headless_mode:
-          #Player code (TODO move player code out of the main loop)
-          if self.network_manager.player_id != None and time.monotonic() - self.client_last_sent_timestamp >= self.client_send_interval:
-            #TODO make this send inputs twice and with a timestamp to let the server not repeat inputs
-            #and to give some reliability to inputs
-            self.network_manager.client_input(self.network_manager.player_id, keys[pygame.K_a], keys[pygame.K_d], keys[pygame.K_w], keys[pygame.K_s])
-            player = self.network_manager.players[self.network_manager.player_id]
-            self.client_last_sent_timestamp = time.monotonic()
+          self.network_manager.receive()
+        
+        
           
-          
-            self.network_manager.send()
           
           
           #GRAPHICS 
@@ -104,8 +114,26 @@ class Engine:
           
           for i in range(len(self.network_manager.players)):
             player = self.network_manager.players[i]
+            #TODO Enable this when done debugging client side prediction.
+            #if player.id == self.network_manager.player_id:
+            #  continue
             interpolated_position = player.previous_position + (player.position - player.previous_position) * (time.monotonic() - player.previous_update_time) / self.host_send_interval
             self.window.fill((127,127,255), pygame.Rect(interpolated_position, pygame.Vector2(16,16)))
+          
+          
+          player = self.client_side_player
+          interpolated_position = player.previous_position + (player.position - player.previous_position) * (time.monotonic() - player.previous_update_time) / self.host_send_interval
+          self.window.fill((255, 127, 255), pygame.Rect(interpolated_position, pygame.Vector2(16,16)))
+          
+          if self.network_manager.player_id != None:
+            for player in self.network_manager.players:
+              if player.id == self.network_manager.player_id:
+                server_player = player
+            if self.client_side_player.position.distance_to(server_player.position) > 0.5:
+              self.client_side_player_lerp_time += 1/self.fps
+              self.client_side_player.position = self.client_side_player.position.lerp(server_player.position, min(self.client_side_player_lerp_time/200, 0.1))
+            else:
+              self.client_side_player_lerp_time = 0
           
           pygame.display.update()
         

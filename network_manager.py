@@ -46,7 +46,7 @@ class NetworkManager:
     
     self.send_buffer = BytesIO()
     self.private_send_buffers: dict[tuple[str, int], BytesIO] = {}
-    self.tick_rate = 1/30
+    self.tick_rate = 1/20 #TODO is this a BUG?
     self.last_tick = time.monotonic()
     
     # (Change) no longer will a player be automatic since even the host is a client
@@ -214,8 +214,11 @@ class NetworkManager:
         enemy.position.y = y
   
   
+  def input_binary(self, left, right, up, down):
+    return left | (right << 1) | (up << 2) | (down << 3)
+  
   def client_input(self, id, left, right, up, down):
-    binary = left | (right << 1) | (up << 2) | (down << 3)
+    binary = self.input_binary(left, right, up, down)
     self.send_buffer.write(struct.pack("!BBB", ID_INPUT, id, binary))
   
   def player_move(self, player: Player, binary: int):
