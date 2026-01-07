@@ -15,13 +15,19 @@ class Engine:
   
   
   def __init__(self, is_server = False, headless = False):
+    
+    
     #this should be stuff available to both the client and the server sides of things
     self.headless_mode = headless
     
     if not self.headless_mode:
       self.window_size = [640, 640]
-      self.window = pygame.display.set_mode(self.window_size)
+      self.window = pygame.display.set_mode(self.window_size, flags=pygame.SCALED)
       if is_server: pygame.display.set_caption("server")
+      
+      self.texture_atlas = pygame.image.load("Assets/Textures.png")
+      self.texture_atlas.set_colorkey((0,0,0))
+      self.sprite_defs = {"player" : [48, 0, 16, 16]}
     
     self.exit_game = False
     self.clock = pygame.time.Clock()
@@ -123,7 +129,8 @@ class Engine:
           
           player = self.client_side_player
           interpolated_position = player.previous_position + (player.position - player.previous_position) * (time.monotonic() - player.previous_update_time) / self.host_send_interval
-          self.window.fill((255, 127, 255), pygame.Rect(interpolated_position, pygame.Vector2(16,16)))
+          #self.window.fill((255, 127, 255), pygame.Rect(interpolated_position, pygame.Vector2(16,16)))
+          self.window.blit(self.texture_atlas, interpolated_position, self.sprite_defs["player"])
           
           if self.network_manager.player_id != None:
             for player in self.network_manager.players:
